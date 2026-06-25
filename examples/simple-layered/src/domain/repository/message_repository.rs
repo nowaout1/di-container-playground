@@ -4,6 +4,6 @@ use eyre::Result;
 use crate::domain::entity::Message;
 
 #[async_trait]
-pub trait MessageRepository: Send + Sync {
+pub trait MessageRepository: std::any::Any + Send + Sync {
     async fn fetch_by_id(&self, user_id: &str) -> Result<Vec<Message>>;
 }

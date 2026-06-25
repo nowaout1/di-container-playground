@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use di::Injectable;
 use eyre::Result;
 
 use crate::domain::{
@@ -11,6 +12,16 @@ use crate::domain::{
 pub struct Messenger {
     pub users: Arc<dyn UserRepository>,
     pub messages: Arc<dyn MessageRepository>,
+}
+
+impl<U, M> Injectable<(Arc<U>, Arc<M>)> for Messenger
+where
+    U: UserRepository,
+    M: MessageRepository,
+{
+    fn inject((users, messages): (Arc<U>, Arc<M>)) -> Self {
+        Self { users, messages }
+    }
 }
 
 impl Messenger {

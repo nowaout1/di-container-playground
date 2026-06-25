@@ -1,15 +1,23 @@
 use std::{
     any::{Any, TypeId},
-    collections::HashMap,
     sync::Arc,
 };
 
+use hashbrown::HashMap;
 // TODO: typed errors (thiserror)
 use eyre::{ContextCompat, Result};
 
+pub fn inject<I, Deps>(container: &Container) -> Result<I>
+where
+    I: Injectable<Deps>,
+    Container: Resolver<I, Deps>,
+{
+    container.resolve()
+}
+
 #[derive(Debug, Clone)]
 pub struct Container {
-    deps: HashMap<TypeId, Arc<dyn Any>>,
+    deps: HashMap<TypeId, Arc<dyn Any + Send + Sync>>,
 }
 
 impl Container {
@@ -21,81 +29,74 @@ impl Container {
 
     pub fn register<T>(&mut self, item: T) -> &mut Self
     where
-        T: Any,
+        T: Any + Send + Sync,
     {
         let id = TypeId::of::<T>();
         self.deps.insert(id, Arc::new(item));
         self
     }
 
-    pub fn get<T>(&self) -> Option<Arc<T>>
+    pub fn get<T>(&self) -> Option<Arc<dyn Any + Send + Sync>>
     where
         T: 'static,
     {
-        let id = TypeId::of::<T>();
-
-        let Some(item) = self.deps.get(&id) else {
-            return None;
-        };
-
-        item.downcast_ref().cloned()
+        self.deps.get(&TypeId::of::<T>()).cloned()
     }
 }
 
-impl Resolver<()> for Container {
-    fn resolve<I>(&self) -> Result<I>
-    where
-        I: Injectable<Dependencies = ()>,
-    {
-        Ok(I::inject(()))
-    }
-}
-
-impl<D1> Resolver<(Arc<D1>,)> for Container
+impl<I, I1> Resolver<I, (Arc<I1>,)> for Container
 where
-    D1: Send + Sync + 'static,
+    I: Injectable<(Arc<I1>,)>,
+    I1: Send + Sync + 'static,
 {
-    fn resolve<I>(&self) -> Result<I>
-    where
-        I: Injectable<Dependencies = (Arc<D1>,)>,
-    {
-        let d1 = self
-            .get::<D1>()
-            .with_context(|| format!("dependency {:?} not found", std::any::type_name::<D1>()))?;
+    fn resolve(&self) -> Result<I> {
+        let a1 = self.get::<I1>().with_context(|| {
+            format!(
+                "failed to resolve dependency {:?}",
+                std::any::type_name::<I1>()
+            )
+        })?;
 
-        Ok(I::inject((d1,)))
+        let i1 = Arc::downcast::<I1>(a1).unwrap();
+
+        Ok(I::inject((i1,)))
     }
 }
 
-impl<D1, D2> Resolver<(Arc<D1>, Arc<D2>)> for Container
+impl<I, I1, I2> Resolver<I, (Arc<I1>, Arc<I2>)> for Container
 where
-    D1: Send + Sync + 'static,
-    D2: Send + Sync + 'static,
+    I: Injectable<(Arc<I1>, Arc<I2>)>,
+    I1: Send + Sync + 'static,
+    I2: Send + Sync + 'static,
 {
-    fn resolve<I>(&self) -> Result<I>
-    where
-        I: Injectable<Dependencies = (Arc<D1>, Arc<D2>)>,
-    {
-        let d1 = self
-            .get::<D1>()
-            .with_context(|| format!("dependency {:?} not found", std::any::type_name::<D1>()))?;
+    fn resolve(&self) -> Result<I> {
+        let a1 = self.get::<I1>().with_context(|| {
+            format!(
+                "failed to resolve dependency {:?}",
+                std::any::type_name::<I1>()
+            )
+        })?;
+        let a2 = self.get::<I2>().with_context(|| {
+            format!(
+                "failed to resolve dependency {:?}",
+                std::any::type_name::<I2>()
+            )
+        })?;
 
-        let d2 = self
-            .get::<D2>()
-            .with_context(|| format!("dependency {:?} not found", std::any::type_name::<D2>()))?;
+        let i1 = Arc::downcast::<I1>(a1).unwrap();
+        let i2 = Arc::downcast::<I2>(a2).unwrap();
 
-        Ok(I::inject((d1, d2)))
+        Ok(I::inject((i1, i2)))
     }
 }
 
-pub trait Resolver<D> {
-    fn resolve<I>(&self) -> Result<I>
-    where
-        I: Injectable<Dependencies = D>;
+pub trait Resolver<I, Deps>
+where
+    I: Injectable<Deps>,
+{
+    fn resolve(&self) -> Result<I>;
 }
 
-pub trait Injectable: Send + Sync {
-    type Dependencies;
-
-    fn inject(deps: Self::Dependencies) -> Self;
+pub trait Injectable<Deps>: Send + Sync {
+    fn inject(deps: Deps) -> Self;
 }

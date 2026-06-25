@@ -1,11 +1,10 @@
 [package]
-name = "di"
+name = "simple-layered"
 version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+di = { path = "../../" }
 async-trait = "0.1.89"
 eyre = "0.6.12"
-hashbrown = "0.17.1"
-thiserror = "2.0.18"
 tokio = { version = "1.52.3", features = ["macros", "rt-multi-thread"] }
