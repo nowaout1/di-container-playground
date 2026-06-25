@@ -1,11 +1,20 @@
 use std::{
-    any::{Any, TypeId},
+    any::{Any, TypeId, type_name},
     sync::Arc,
 };
 
 use hashbrown::HashMap;
-// TODO: typed errors (thiserror)
-use eyre::{ContextCompat, Result};
+
+#[derive(thiserror::Error, Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum Error {
+    #[error("dependency {0} not found")]
+    NotFound(String),
+
+    #[error("incompatible type provided {0}")]
+    Incompatible(String),
+}
+
+pub type Result<T> = std::result::Result<T, Error>;
 
 pub fn inject<I, Deps>(container: &Container) -> Result<I>
 where
@@ -50,14 +59,12 @@ where
     I1: Send + Sync + 'static,
 {
     fn resolve(&self) -> Result<I> {
-        let a1 = self.get::<I1>().with_context(|| {
-            format!(
-                "failed to resolve dependency {:?}",
-                std::any::type_name::<I1>()
-            )
-        })?;
+        let a1 = self
+            .get::<I1>()
+            .ok_or_else(|| Error::NotFound(type_name::<I1>().to_string()))?;
 
-        let i1 = Arc::downcast::<I1>(a1).unwrap();
+        let i1 = Arc::downcast::<I1>(a1)
+            .map_err(|_| Error::Incompatible(type_name::<I1>().to_string()))?;
 
         Ok(I::inject((i1,)))
     }
@@ -70,21 +77,17 @@ where
     I2: Send + Sync + 'static,
 {
     fn resolve(&self) -> Result<I> {
-        let a1 = self.get::<I1>().with_context(|| {
-            format!(
-                "failed to resolve dependency {:?}",
-                std::any::type_name::<I1>()
-            )
-        })?;
-        let a2 = self.get::<I2>().with_context(|| {
-            format!(
-                "failed to resolve dependency {:?}",
-                std::any::type_name::<I2>()
-            )
-        })?;
+        let a1 = self
+            .get::<I1>()
+            .ok_or_else(|| Error::NotFound(type_name::<I1>().to_string()))?;
+        let a2 = self
+            .get::<I2>()
+            .ok_or_else(|| Error::NotFound(type_name::<I1>().to_string()))?;
 
-        let i1 = Arc::downcast::<I1>(a1).unwrap();
-        let i2 = Arc::downcast::<I2>(a2).unwrap();
+        let i1 = Arc::downcast::<I1>(a1)
+            .map_err(|_| Error::Incompatible(type_name::<I1>().to_string()))?;
+        let i2 = Arc::downcast::<I2>(a2)
+            .map_err(|_| Error::Incompatible(type_name::<I2>().to_string()))?;
 
         Ok(I::inject((i1, i2)))
     }
