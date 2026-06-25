@@ -26,7 +26,10 @@ async fn main() -> eyre::Result<()> {
         .register(PostgresUserRepository::new())
         .register(PostgresMessageRepository::new());
 
-    let messenger = di::inject::<Messenger, MixedDeps>(&container)?;
+    container.register(di::resolve::<Messenger, MixedDeps>(&container)?);
+
+    let messenger = container.get::<Messenger>()?;
+
     let _dialog: Dialog = messenger.load_dialog("user:123").await?;
 
     Ok(())

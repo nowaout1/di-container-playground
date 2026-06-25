@@ -14,7 +14,7 @@ impl PostgresUserRepository {
 
 #[async_trait]
 impl UserRepository for PostgresUserRepository {
-    async fn fetch_by_id(&self, id: &str) -> Result<Option<User>> {
+    async fn fetch_by_id(&self, _id: &str) -> Result<Option<User>> {
         unimplemented!()
     }
 }

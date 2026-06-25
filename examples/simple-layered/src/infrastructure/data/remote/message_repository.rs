@@ -14,7 +14,7 @@ impl PostgresMessageRepository {
 
 #[async_trait]
 impl MessageRepository for PostgresMessageRepository {
-    async fn fetch_by_id(&self, id: &str) -> Result<Vec<Message>> {
+    async fn fetch_by_id(&self, _id: &str) -> Result<Vec<Message>> {
         unimplemented!()
     }
 }

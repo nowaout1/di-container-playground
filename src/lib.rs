@@ -16,7 +16,7 @@ pub enum Error {
 
 pub type Result<T> = std::result::Result<T, Error>;
 
-pub fn inject<I, Deps>(container: &Container) -> Result<I>
+pub fn resolve<I, Deps>(container: &Container) -> Result<I>
 where
     I: Injectable<Deps>,
     Container: Resolver<I, Deps>,
@@ -45,53 +45,50 @@ impl Container {
         self
     }
 
-    pub fn get<T>(&self) -> Option<Arc<dyn Any + Send + Sync>>
+    pub fn get<T>(&self) -> Result<Arc<T>>
     where
-        T: 'static,
+        T: Send + Sync + 'static,
     {
-        self.deps.get(&TypeId::of::<T>()).cloned()
+        let Some(item) = self.deps.get(&TypeId::of::<T>()).cloned() else {
+            return Err(Error::NotFound(type_name::<T>().to_string()));
+        };
+
+        Arc::downcast::<T>(item).map_err(|_| Error::Incompatible(type_name::<T>().to_string()))
     }
 }
 
-impl<I, I1> Resolver<I, (Arc<I1>,)> for Container
-where
-    I: Injectable<(Arc<I1>,)>,
-    I1: Send + Sync + 'static,
-{
-    fn resolve(&self) -> Result<I> {
-        let a1 = self
-            .get::<I1>()
-            .ok_or_else(|| Error::NotFound(type_name::<I1>().to_string()))?;
+macro_rules! impl_resolver {
+    ($($T:ident),+) => {
+        impl<I, $($T),+> Resolver<I, ($(Arc<$T>,)+)> for Container
+        where
+            I: Injectable<($(Arc<$T>,)+)>,
+            $($T: Send + Sync + 'static,)+
+        {
+            fn resolve(&self) -> Result<I> {
+                let deps = (
+                    $(
+                        self.get::<$T>()?,
+                    )+
+                );
 
-        let i1 = Arc::downcast::<I1>(a1)
-            .map_err(|_| Error::Incompatible(type_name::<I1>().to_string()))?;
-
-        Ok(I::inject((i1,)))
-    }
+                Ok(I::inject(deps))
+            }
+        }
+    };
 }
 
-impl<I, I1, I2> Resolver<I, (Arc<I1>, Arc<I2>)> for Container
-where
-    I: Injectable<(Arc<I1>, Arc<I2>)>,
-    I1: Send + Sync + 'static,
-    I2: Send + Sync + 'static,
-{
-    fn resolve(&self) -> Result<I> {
-        let a1 = self
-            .get::<I1>()
-            .ok_or_else(|| Error::NotFound(type_name::<I1>().to_string()))?;
-        let a2 = self
-            .get::<I2>()
-            .ok_or_else(|| Error::NotFound(type_name::<I1>().to_string()))?;
-
-        let i1 = Arc::downcast::<I1>(a1)
-            .map_err(|_| Error::Incompatible(type_name::<I1>().to_string()))?;
-        let i2 = Arc::downcast::<I2>(a2)
-            .map_err(|_| Error::Incompatible(type_name::<I2>().to_string()))?;
-
-        Ok(I::inject((i1, i2)))
-    }
-}
+impl_resolver!(I1);
+impl_resolver!(I1, I2);
+impl_resolver!(I1, I2, I3);
+impl_resolver!(I1, I2, I3, I4);
+impl_resolver!(I1, I2, I3, I4, I5);
+impl_resolver!(I1, I2, I3, I4, I5, I6);
+impl_resolver!(I1, I2, I3, I4, I5, I6, I7);
+impl_resolver!(I1, I2, I3, I4, I5, I6, I7, I8);
+impl_resolver!(I1, I2, I3, I4, I5, I6, I7, I8, I9);
+impl_resolver!(I1, I2, I3, I4, I5, I6, I7, I8, I9, I10);
+impl_resolver!(I1, I2, I3, I4, I5, I6, I7, I8, I9, I10, I11);
+impl_resolver!(I1, I2, I3, I4, I5, I6, I7, I8, I9, I10, I11, I12);
 
 pub trait Resolver<I, Deps>
 where

@@ -1,10 +1,8 @@
 [package]
 name = "di"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2024"
 
 [dependencies]
-async-trait = "0.1.89"
 hashbrown = "0.17.1"
 thiserror = "2.0.18"
-tokio = { version = "1.52.3", features = ["macros", "rt-multi-thread"] }
